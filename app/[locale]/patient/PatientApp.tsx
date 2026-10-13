@@ -13,6 +13,8 @@ import { nearestZone } from "@/lib/geo";
 import type { Clinic, MyRequest, PatientRequest } from "@/lib/types";
 import EmailOtpLogin from "@/components/EmailOtpLogin";
 import PatientProfile from "@/components/PatientProfile";
+import TabBar, { ICONS, Principles } from "@/components/TabBar";
+import ProfileTab from "@/components/ProfileTab";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
 type Tracked = { data: PatientRequest; receivedAt: number };
@@ -30,6 +32,7 @@ export default function PatientApp() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [geo, setGeo] = useState<"idle" | "locating" | "outside" | "denied" | "found">("idle");
+  const [tab, setTab] = useState("find");
   const [history, setHistory] = useState<MyRequest[]>([]);
   const [request, setRequest] = useState<Tracked | null>(null);
   const requestRef = useRef<Tracked | null>(null);
@@ -220,92 +223,108 @@ export default function PatientApp() {
     return <PatientProfile initialName={firstName} initialPhone={phone} onSaved={() => {}} />;
   }
 
+  const tabs = [
+    { id: "find", label: t.tabs.patient, icon: ICONS.clinic },
+    { id: "requests", label: t.tabs.requests, icon: ICONS.receipt },
+    { id: "profile", label: t.tabs.profile, icon: ICONS.person },
+  ];
+
   return (
-    <div className="stack-lg">
-      <div className="row between">
-        <span className="muted small">
-          {fmt(t.patient.hello, { name: firstName })} ·{" "}
-          <span dir="ltr">{auth.user.email}</span>
-        </span>
-        <button className="btn btn-ghost" onClick={auth.signOut}>
-          {t.common.logout}
-        </button>
-      </div>
-      <section className="card">
-        <h2>{t.patient.zoneTitle}</h2>
-        <button type="button" className="btn btn-secondary" onClick={locate} disabled={geo === "locating"}>
-          {geo === "locating" ? t.patient.locating : `📍 ${t.patient.useLocation}`}
-        </button>
-        {geo === "found" && zoneId && (
-          <p className="muted small">{fmt(t.patient.zoneDetected, { zone: zoneName(zoneId, locale) })}</p>
-        )}
-        {geo === "outside" && <InfoNotice tone="warn">{t.patient.locationOutside}</InfoNotice>}
-        {geo === "denied" && <InfoNotice tone="warn">{t.patient.locationDenied}</InfoNotice>}
-        <div className="zone-grid" role="radiogroup" aria-label={t.patient.zoneTitle}>
-          {ZONES.map((z) => (
-            <button
-              key={z.id}
-              type="button"
-              role="radio"
-              aria-checked={zoneId === z.id}
-              className={`chip ${zoneId === z.id ? "chip-on" : ""}`}
-              onClick={() => setZoneId(z.id)}
-            >
-              {zoneLabel(z)}
+    <div className="with-tabs">
+      {tab === "find" && (
+        <div className="stack-lg">
+          <section className="card stack">
+            <h2>{t.patient.zoneTitle}</h2>
+            <button type="button" className="btn btn-secondary" onClick={locate} disabled={geo === "locating"}>
+              {geo === "locating" ? t.patient.locating : `📍 ${t.patient.useLocation}`}
             </button>
-          ))}
-        </div>
-      </section>
-
-      {zoneId && (
-        <section className="card">
-          <h2>{t.patient.clinicsTitle}</h2>
-          {clinics === null ? (
-            <p className="muted">{t.common.loading}</p>
-          ) : clinics.length === 0 ? (
-            <InfoNotice tone="warn">{t.patient.noClinics}</InfoNotice>
-          ) : (
-            <ul className="clinic-list">
-              {clinics.map((c) => (
-                <li key={c.id} className="clinic">
-                  <div>
-                    <strong>{c.clinic_name}</strong>
-                    <div className="muted">{c.dentist_name}</div>
-                    <div className="badge badge-ok">
-                      {fmt(t.patient.availableFor, { n: minutesUntil(c.available_until) })}
-                    </div>
-                  </div>
-                  <button className="btn btn-primary" disabled={busy} onClick={() => sendRequest(c)}>
-                    {t.patient.choose}
-                  </button>
-                </li>
+            {geo === "found" && zoneId && (
+              <p className="muted small">{fmt(t.patient.zoneDetected, { zone: zoneName(zoneId, locale) })}</p>
+            )}
+            {geo === "outside" && <InfoNotice tone="warn">{t.patient.locationOutside}</InfoNotice>}
+            {geo === "denied" && <InfoNotice tone="warn">{t.patient.locationDenied}</InfoNotice>}
+            <div className="zone-grid" role="radiogroup" aria-label={t.patient.zoneTitle}>
+              {ZONES.map((z) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={zoneId === z.id}
+                  className={`chip ${zoneId === z.id ? "chip-on" : ""}`}
+                  onClick={() => setZoneId(z.id)}
+                >
+                  {zoneLabel(z)}
+                </button>
               ))}
-            </ul>
+            </div>
+          </section>
+
+          {!zoneId ? (
+            <InfoNotice>{t.patient.pickZoneHint}</InfoNotice>
+          ) : (
+            <section className="stack">
+              <h2>{t.patient.clinicsTitle}</h2>
+              {clinics === null ? (
+                <p className="muted">{t.common.loading}</p>
+              ) : clinics.length === 0 ? (
+                <InfoNotice tone="warn">{t.patient.noClinics}</InfoNotice>
+              ) : (
+                clinics.map((c) => (
+                  <article key={c.id} className="card stack">
+                    <div className="row between" style={{ flexWrap: "nowrap" }}>
+                      <div className="row" style={{ flexWrap: "nowrap" }}>
+                        <span className="clinic-ico">{ICONS.clinic}</span>
+                        <strong style={{ fontSize: "1.05rem" }}>{c.clinic_name}</strong>
+                      </div>
+                      <span style={{ color: "var(--primary)" }}>{ICONS.shield}</span>
+                    </div>
+                    <div className="muted">
+                      {c.dentist_name} · {zoneName(c.zone_id, locale)}
+                    </div>
+                    <div style={{ color: "var(--primary)" }}>
+                      {t.patient.availableConfirm} · {fmt(t.patient.availableFor, { n: minutesUntil(c.available_until) })}
+                    </div>
+                    <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => sendRequest(c)}>
+                      {t.patient.choose}
+                    </button>
+                  </article>
+                ))
+              )}
+            </section>
           )}
-        </section>
+          <ErrorNotice error={error} />
+          <Principles text={t.profilePage.principles} />
+        </div>
       )}
 
-      <ErrorNotice error={error} />
-
-      {history.length > 0 && (
-        <section className="card">
-          <h2>{t.patient.myRequests}</h2>
-          <ul className="clinic-list">
-            {history.map((h) => (
-              <li key={h.id} className="clinic">
-                <div>
+      {tab === "requests" && (
+        <div className="stack-lg">
+          <div className="page-heading">
+            <h2>{t.patient.myRequests}</h2>
+          </div>
+          {history.length === 0 ? (
+            <InfoNotice>{t.patient.noRequestsYet}</InfoNotice>
+          ) : (
+            history.map((h) => (
+              <article key={h.id} className="card stack">
+                <div className="row between">
                   <strong>{h.clinic_name}</strong>
-                  <div className="muted small">
-                    {new Date(h.created_at).toLocaleString(locale === "ar" ? "ar-TN" : "fr-TN")} ·{" "}
-                    {zoneName(h.zone_id, locale)}
-                  </div>
+                  <span className="badge">{t.requestStatus[h.status]}</span>
                 </div>
-                <span className="badge">{t.requestStatus[h.status]}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+                <div className="muted small">
+                  {new Date(h.created_at).toLocaleString(locale === "ar" ? "ar-TN" : "fr-TN")} · {zoneName(h.zone_id, locale)}
+                </div>
+              </article>
+            ))
+          )}
+        </div>
       )}
+
+      {tab === "profile" && (
+        <ProfileTab role="patient" name={firstName} email={auth.user.email ?? ""} onLogout={auth.signOut} />
+      )}
+
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </div>
   );
 }

@@ -13,6 +13,8 @@ import { normalizeTnPhone } from "@/lib/phone";
 import { beep } from "@/lib/alert";
 import type { DentistRow, InboxRequest } from "@/lib/types";
 import PasswordAuth from "@/components/PasswordAuth";
+import TabBar, { ICONS } from "@/components/TabBar";
+import ProfileTab from "@/components/ProfileTab";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
 export default function DentistApp() {
@@ -42,6 +44,7 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
   const [row, setRow] = useState<DentistRow | null>(null);
   const [rowLoaded, setRowLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState("cabinet");
   const [inbox, setInbox] = useState<{ items: InboxRequest[]; receivedAt: number }>({ items: [], receivedAt: Date.now() });
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +70,7 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
     if (seen.current === null) seen.current = new Set(items.map((i) => i.id));
     const fresh = pendingIds.filter((id) => !seen.current!.has(id));
     if (fresh.length) {
+      setTab("requests");
       beep();
       try {
         navigator.vibrate?.([200, 100, 200]);
@@ -154,17 +158,16 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
   const history = inbox.items.filter((i) => !["pending", "accepted", "arrived"].includes(i.status));
   const locked = active.length > 0 || pending.length > 0;
 
-  return (
-    <div className="stack-lg">
-      <div className="row between">
-        <span className="muted small" dir="ltr">
-          {email}
-        </span>
-        <button className="btn btn-ghost" onClick={onLogout}>
-          {t.common.logout}
-        </button>
-      </div>
+  const tabs = [
+    { id: "cabinet", label: t.tabs.dentist, icon: ICONS.clinic },
+    { id: "requests", label: t.tabs.requests, icon: ICONS.receipt, badge: pending.length || undefined },
+    { id: "profile", label: t.tabs.profile, icon: ICONS.person },
+  ];
 
+  return (
+    <div className="with-tabs">
+      {tab === "cabinet" && (
+    <div className="stack-lg">
       {row && !editing && (
         <section className="card stack">
           <div className="row between">
@@ -227,6 +230,20 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
             <p className="muted small">{t.dentist.availNote}</p>
           </section>
 
+        </>
+      )}
+      <ErrorNotice error={error} />
+    </div>
+      )}
+
+      {tab === "requests" && (
+        <div className="stack-lg">
+          <div className="page-heading">
+            <h2>{t.tabs.requests}</h2>
+          </div>
+          {!approved && <InfoNotice>{t.dentist.statusPendingText}</InfoNotice>}
+          {approved && (
+        <>
           {active.map((r) => (
             <section key={r.id} className="card stack" aria-live="polite">
               <div className="row between">
@@ -299,8 +316,13 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
           )}
         </>
       )}
+          <ErrorNotice error={error} />
+        </div>
+      )}
 
-      <ErrorNotice error={error} />
+      {tab === "profile" && <ProfileTab role="dentist" name={row?.full_name} email={email} onLogout={onLogout} />}
+
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </div>
   );
 }

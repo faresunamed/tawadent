@@ -8,6 +8,8 @@ import { zoneName } from "@/lib/zones";
 import { minutesUntil } from "@/lib/time";
 import type { AdminDentist, AdminOverview, AdminRecentRequest, AuditEvent, DentistStatus } from "@/lib/types";
 import PasswordAuth from "@/components/PasswordAuth";
+import TabBar, { ICONS } from "@/components/TabBar";
+import ProfileTab from "@/components/ProfileTab";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
 const STATUSES: DentistStatus[] = ["pending", "approved", "suspended", "rejected"];
@@ -31,11 +33,12 @@ export default function AdminApp() {
       </div>
     );
   }
-  return <AdminDashboard onLogout={auth.signOut} />;
+  return <AdminDashboard onLogout={auth.signOut} email={auth.user.email ?? ""} />;
 }
 
-function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+function AdminDashboard({ onLogout, email }: { onLogout: () => void; email: string }) {
   const { t, locale } = useT();
+  const [tab, setTab] = useState("validation");
   const [filter, setFilter] = useState<DentistStatus | "all">("pending");
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [dentists, setDentists] = useState<AdminDentist[] | null>(null);
@@ -92,14 +95,17 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     </div>
   );
 
+  const tabs = [
+    { id: "validation", label: t.tabs.admin, icon: ICONS.shield },
+    { id: "activity", label: t.tabs.activity, icon: ICONS.receipt },
+    { id: "profile", label: t.tabs.profile, icon: ICONS.person },
+  ];
+
   return (
+    <div className="with-tabs">
+      {tab === "validation" && (
     <div className="stack-lg">
-      <div className="row between">
-        <h2>{t.admin.overview}</h2>
-        <button className="btn btn-ghost" onClick={onLogout}>
-          {t.common.logout}
-        </button>
-      </div>
+      <h2>{t.admin.overview}</h2>
 
       <section className="card stack">
         <div className="stats">
@@ -181,6 +187,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         )}
       </section>
 
+      <ErrorNotice error={error} />
+    </div>
+      )}
+
+      {tab === "activity" && (
+    <div className="stack-lg">
       <section className="card stack">
         <h2>{t.admin.recentTitle}</h2>
         <div className="table-wrap">
@@ -250,6 +262,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       </section>
 
       <ErrorNotice error={error} />
+    </div>
+      )}
+
+      {tab === "profile" && <ProfileTab role="admin" email={email} onLogout={onLogout} />}
+
+      <TabBar tabs={tabs} active={tab} onChange={setTab} />
     </div>
   );
 }

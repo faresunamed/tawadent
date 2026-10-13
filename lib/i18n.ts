@@ -64,7 +64,10 @@ const fr = {
     noClinics:
       "Aucun cabinet disponible dans cette zone pour le moment. Essayez une zone voisine ou revenez dans quelques minutes.",
     availableFor: "Disponible encore {n} min",
-    choose: "Demander ce cabinet",
+    choose: "Choisir ce cabinet",
+    availableConfirm: "Disponible · confirmation sous 60 secondes",
+    pickZoneHint: "Choisissez votre zone pour voir les dentistes disponibles.",
+    noRequestsYet: "Aucune demande pour le moment.",
     changeZone: "Changer de zone",
     requestTitle: "3. Votre demande",
     selectedClinic: "Cabinet choisi : {clinic}",
@@ -230,6 +233,20 @@ const fr = {
       suspended: "Profil suspendu",
     },
   },
+  tabs: {
+    patient: "Dentistes",
+    dentist: "Mon cabinet",
+    admin: "Validation",
+    requests: "Demandes",
+    activity: "Activité",
+    profile: "Profil",
+  },
+  profilePage: {
+    title: "Mon profil",
+    roles: { patient: "Patient", dentist: "Dentiste", admin: "Administrateur" },
+    principles:
+      "Urgences dentaires uniquement. Aucun motif médical demandé, aucun diagnostic. Vous choisissez librement votre dentiste. Aucun paiement, classement payant ou avis.",
+  },
   requestStatus: {
     pending: "En attente",
     accepted: "Confirmée · patient en route",
@@ -315,7 +332,10 @@ const ar: Dict = {
     clinicsTitle: "2. العيادات المتاحة الآن",
     noClinics: "لا توجد عيادة متاحة في هذه المنطقة حاليًا. جرّب منطقة مجاورة أو عد بعد بضع دقائق.",
     availableFor: "متاحة لمدة {n} دقيقة أخرى",
-    choose: "اطلب هذه العيادة",
+    choose: "اختيار هذه العيادة",
+    availableConfirm: "متوفرة · التأكيد خلال 60 ثانية",
+    pickZoneHint: "اختر منطقتك لعرض أطباء الأسنان المتوفرين.",
+    noRequestsYet: "لا توجد طلبات حالياً.",
     changeZone: "تغيير المنطقة",
     requestTitle: "3. طلبك",
     selectedClinic: "العيادة المختارة: {clinic}",
@@ -477,6 +497,20 @@ const ar: Dict = {
       rejected: "تم رفض الملف",
       suspended: "تم تعليق الملف",
     },
+  },
+  tabs: {
+    patient: "أطباء الأسنان",
+    dentist: "عيادتي",
+    admin: "التحقق",
+    requests: "الطلبات",
+    activity: "النشاط",
+    profile: "الملف",
+  },
+  profilePage: {
+    title: "ملفي",
+    roles: { patient: "مريض", dentist: "طبيب أسنان", admin: "الإدارة" },
+    principles:
+      "لحالات طوارئ الأسنان فقط. لا نجمع السبب الطبي ولا نقدم تشخيصاً. تختار طبيبك بحرية. لا مدفوعات ولا ترتيب مدفوع ولا تقييمات.",
   },
   requestStatus: {
     pending: "في الانتظار",

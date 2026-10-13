@@ -11,7 +11,7 @@ await sharp(svg, { density: 600 }).resize(512, 512).png().toFile("public/icons/i
 
 // Version "maskable" : le logo occupe 70 % au centre sur fond uni (zone de sécurité Android).
 const inner = await sharp(svg, { density: 600 }).resize(360, 360).png().toBuffer();
-await sharp({ create: { width: 512, height: 512, channels: 4, background: "#0f766e" } })
+await sharp({ create: { width: 512, height: 512, channels: 4, background: "#087f8c" } })
   .composite([{ input: inner, gravity: "center" }])
   .png()
   .toFile("public/icons/icon-maskable-512.png");

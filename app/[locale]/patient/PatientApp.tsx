@@ -12,6 +12,7 @@ import { formatCountdown, minutesUntil } from "@/lib/time";
 import { nearestZone } from "@/lib/geo";
 import type { Clinic, MyRequest, PatientRequest } from "@/lib/types";
 import EmailOtpLogin from "@/components/EmailOtpLogin";
+import PatientProfile from "@/components/PatientProfile";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
 type Tracked = { data: PatientRequest; receivedAt: number };
@@ -20,13 +21,12 @@ export default function PatientApp() {
   const { t, locale } = useT();
   const auth = useAuth();
   const userId = auth.user?.id ?? null;
+  const meta = (auth.user?.user_metadata ?? {}) as { first_name?: string; phone?: string };
+  const firstName = (meta.first_name ?? "").trim();
+  const phone = (meta.phone ?? "").trim();
 
   const [zoneId, setZoneId] = useState("");
   const [clinics, setClinics] = useState<Clinic[] | null>(null);
-  const [selected, setSelected] = useState<Clinic | null>(null);
-  const [firstName, setFirstName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [geo, setGeo] = useState<"idle" | "locating" | "outside" | "denied" | "found">("idle");
@@ -85,7 +85,6 @@ export default function PatientApp() {
 
   useEffect(() => {
     setClinics(null);
-    setSelected(null);
     if (!zoneId) return;
     loadClinics();
     if (request) return;
@@ -133,16 +132,14 @@ export default function PatientApp() {
   }, [pending, requestId, userId, refreshRequest, request?.data.status]);
 
   // --- Actions ---
-  async function sendRequest(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selected) return;
+  async function sendRequest(clinic: Clinic) {
     setBusy(true);
     setError(null);
     const sb = getSupabase();
     const created = await sb.rpc("create_request", {
-      p_dentist: selected.id,
+      p_dentist: clinic.id,
       p_first_name: firstName,
-      p_phone: phone.trim() || null,
+      p_phone: phone || null,
     });
     if (created.error) {
       setBusy(false);
@@ -176,14 +173,12 @@ export default function PatientApp() {
 
   function backToList() {
     setRequest(null);
-    setSelected(null);
     setError(null);
     loadClinics();
   }
 
   function newSearch() {
     setRequest(null);
-    setSelected(null);
     setZoneId("");
     setError(null);
   }
@@ -209,8 +204,33 @@ export default function PatientApp() {
   const zoneLabel = (z: { fr: string; ar: string }) => z[locale];
   const wrongRole = auth.user && auth.role && auth.role !== "patient";
 
+  // Inscription / connexion obligatoire avant d'accéder à l'interface.
+  if (!auth.user) return <EmailOtpLogin redirectPath={`/${locale}/patient`} />;
+  if (wrongRole) {
+    return (
+      <div className="stack">
+        <InfoNotice tone="warn">{t.patient.wrongRole}</InfoNotice>
+        <button className="btn btn-ghost" onClick={auth.signOut}>
+          {t.common.logout}
+        </button>
+      </div>
+    );
+  }
+  if (!firstName || !phone) {
+    return <PatientProfile initialName={firstName} initialPhone={phone} onSaved={() => {}} />;
+  }
+
   return (
     <div className="stack-lg">
+      <div className="row between">
+        <span className="muted small">
+          {fmt(t.patient.hello, { name: firstName })} ·{" "}
+          <span dir="ltr">{auth.user.email}</span>
+        </span>
+        <button className="btn btn-ghost" onClick={auth.signOut}>
+          {t.common.logout}
+        </button>
+      </div>
       <section className="card">
         <h2>{t.patient.zoneTitle}</h2>
         <button type="button" className="btn btn-secondary" onClick={locate} disabled={geo === "locating"}>
@@ -247,7 +267,7 @@ export default function PatientApp() {
           ) : (
             <ul className="clinic-list">
               {clinics.map((c) => (
-                <li key={c.id} className={`clinic ${selected?.id === c.id ? "clinic-on" : ""}`}>
+                <li key={c.id} className="clinic">
                   <div>
                     <strong>{c.clinic_name}</strong>
                     <div className="muted">{c.dentist_name}</div>
@@ -255,7 +275,7 @@ export default function PatientApp() {
                       {fmt(t.patient.availableFor, { n: minutesUntil(c.available_until) })}
                     </div>
                   </div>
-                  <button className="btn btn-primary" onClick={() => setSelected(c)}>
+                  <button className="btn btn-primary" disabled={busy} onClick={() => sendRequest(c)}>
                     {t.patient.choose}
                   </button>
                 </li>
@@ -263,52 +283,6 @@ export default function PatientApp() {
             </ul>
           )}
         </section>
-      )}
-
-      {selected && wrongRole && <InfoNotice tone="warn">{t.patient.wrongRole}</InfoNotice>}
-
-      {selected && !auth.user && <EmailOtpLogin redirectPath={`/${locale}/patient`} />}
-
-      {selected && auth.user && auth.role === "patient" && (
-        <form className="card stack" onSubmit={sendRequest}>
-          <h2>{t.patient.requestTitle}</h2>
-          <p>
-            <strong>{fmt(t.patient.selectedClinic, { clinic: selected.clinic_name })}</strong>
-          </p>
-          <label className="field">
-            <span className="label">{t.patient.firstName}</span>
-            <input
-              className="input"
-              required
-              maxLength={60}
-              autoComplete="given-name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span className="label">{t.patient.phoneOptional}</span>
-            <input
-              className="input"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              pattern="[0-9+ ()\-]{6,30}"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              dir="ltr"
-            />
-            <span className="help">{t.patient.phoneHelp}</span>
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required />
-            <span>{t.patient.consent}</span>
-          </label>
-          <button className="btn btn-danger btn-lg" disabled={busy || !consent || !firstName.trim()}>
-            {busy ? t.patient.sending : t.patient.send}
-          </button>
-          <p className="muted small">{t.patient.loggedAs.replace("{email}", auth.user.email ?? "")}</p>
-        </form>
       )}
 
       <ErrorNotice error={error} />

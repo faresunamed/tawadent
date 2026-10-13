@@ -2,6 +2,7 @@
 
 import { useT } from "@/lib/useLocale";
 import { errorCode } from "@/lib/errors";
+import { missingSupabaseVars } from "@/lib/supabase";
 
 export function ErrorNotice({ error }: { error: unknown }) {
   const { t } = useT();
@@ -24,9 +25,15 @@ export function InfoNotice({ children, tone = "info" }: { children: React.ReactN
 
 export function ConfigNotice() {
   const { t } = useT();
+  const missing = missingSupabaseVars();
   return (
     <div className="alert alert-warn" role="alert">
       {t.errors.supabase_not_configured}
+      {missing.length > 0 && (
+        <div className="small" dir="ltr" style={{ marginTop: 6 }}>
+          <code>{missing.join(", ")}</code>
+        </div>
+      )}
     </div>
   );
 }

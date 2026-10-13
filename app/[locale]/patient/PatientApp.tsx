@@ -11,7 +11,7 @@ import { directionsUrl, telUrl } from "@/lib/maps";
 import { formatCountdown, minutesUntil } from "@/lib/time";
 import { nearestZone } from "@/lib/geo";
 import type { Clinic, MyRequest, PatientRequest } from "@/lib/types";
-import EmailOtpLogin from "@/components/EmailOtpLogin";
+import PatientAuth from "@/components/PatientAuth";
 import PatientProfile from "@/components/PatientProfile";
 import TabBar, { ICONS, Principles } from "@/components/TabBar";
 import ProfileTab from "@/components/ProfileTab";
@@ -208,7 +208,7 @@ export default function PatientApp() {
   const wrongRole = auth.user && auth.role && auth.role !== "patient";
 
   // Inscription / connexion obligatoire avant d'accéder à l'interface.
-  if (!auth.user) return <EmailOtpLogin redirectPath={`/${locale}/patient`} />;
+  if (!auth.user) return <PatientAuth redirectPath={`/${locale}/patient`} />;
   if (wrongRole) {
     return (
       <div className="stack">

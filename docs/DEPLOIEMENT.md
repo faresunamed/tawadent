@@ -8,28 +8,17 @@ Les clés `sb_secret_...` ont été collées dans une conversation : **considèr
 Dans Supabase : *Project Settings → API Keys* → régénère la clé secrète. Tu n'en as pas besoin pour cette application.
 Si un ancien projet Supabase de test n'est plus utilisé, supprime-le (ses clés ont aussi été exposées).
 
-## 1. Mettre le code sur GitHub
+## 1. Récupérer le code
 
-**Cas A — tu as reçu le zip avec le dossier caché `.git` (recommandé).** Décompresse, puis :
-
-```bash
-cd tawadent
-git push -u origin main
-```
-
-**Cas B — le dossier `.git` n'est pas là.** Clone le dépôt vide, copie-y tout le contenu du zip (fichiers cachés compris, comme `.gitignore`), puis :
+Le code est déjà dans ton dépôt GitHub `faresunamed/tawadent` (branche `main`). Pour travailler dessus sur ton ordinateur :
 
 ```bash
 git clone https://github.com/faresunamed/tawadent.git
 cd tawadent
-# (copie ici le contenu du zip)
-git add .
-git commit -m "Version initiale TawaDent"
-git branch -M main
-git push -u origin main
+npm install
+cp .env.example .env.local    # puis remplis les 2 variables publiques
+npm run dev
 ```
-
-Si GitHub demande un mot de passe, utilise un *Personal Access Token* (GitHub → Settings → Developer settings) ou GitHub Desktop.
 
 ## 2. Préparer Supabase
 

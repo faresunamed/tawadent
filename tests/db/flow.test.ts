@@ -7,12 +7,14 @@ let dentistId: string;
 let patientA: string;
 let patientB: string;
 
+let seq = 100;
 const SAVE_PROFILE = `select public.save_dentist_profile($1,$2,$3,$4,$5,$6,$7,$8) as s`;
 
 async function approvedAvailableDentist(email = "dentist@test.tn", zone = "lac-1") {
   const id = await db.newUser(email, "dentist");
   const p = [...PROFILE.full];
   p[3] = zone;
+  p[7] = `ORDRE-${++seq}`;
   await db.as(id, () => db.call(SAVE_PROFILE, p));
   await db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'approved', null)`, [id]));
   await db.as(id, () => db.call(`select public.set_availability(true)`));
@@ -144,15 +146,18 @@ describe("demande d'urgence (60 s)", () => {
 
     const req = await db.as(patientA, () => db.call(`select public.get_request($1) as j`, [r[0].id]));
     expect(req[0].j.status).toBe("accepted");
-    expect(req[0].j.clinic.phone).toBe("+216 20 000 000");
+    expect(req[0].j.clinic.phone).toBe("+21620000000");
     expect(req[0].j.clinic.address).toContain("Lac");
 
-    const dent = await db.admin(`select available_until from public.dentists where id = $1`, [dentistId]);
-    expect(dent[0].available_until).toBeNull();
+    // Réservé : invisible, et impossible de se redéclarer tant que la consultation n'est pas terminée.
     const list = await db.asAnon(() => db.call(`select * from public.list_available_clinics('lac-1')`));
     expect(list).toHaveLength(0);
+    await db.as(patientA, () => db.call(`select public.mark_arrived($1)`, [r[0].id]));
+    await db.as(dentistId, () => db.call(`select public.complete_request($1)`, [r[0].id]));
 
-    // Il faut se redéclarer disponible pour recevoir une nouvelle demande.
+    // Disponibilité consommée : il faut se redéclarer.
+    const dent = await db.admin(`select available_until from public.dentists where id = $1`, [dentistId]);
+    expect(dent[0].available_until).toBeNull();
     await db.as(dentistId, () => db.call(`select public.set_availability(true)`));
     const again = await db.asAnon(() => db.call(`select * from public.list_available_clinics('lac-1')`));
     expect(again).toHaveLength(1);
@@ -166,14 +171,16 @@ describe("demande d'urgence (60 s)", () => {
     expect(list).toHaveLength(1);
   });
 
-  it("expire après 60 s : le patient peut choisir un autre cabinet, le cabinet doit se redéclarer", async () => {
+  it("expire après 60 s : le patient peut choisir un autre cabinet, le cabinet reste disponible", async () => {
     const r = await db.as(patientA, () => db.call(`select public.create_request($1, 'Sami', null) as id`, [dentistId]));
     await db.admin(`update public.requests set expires_at = now() - interval '1 second' where id = $1`, [r[0].id]);
 
     const req = await db.as(patientA, () => db.call(`select public.get_request($1) as j`, [r[0].id]));
     expect(req[0].j.status).toBe("expired");
     const dent = await db.admin(`select available_until from public.dentists where id = $1`, [dentistId]);
-    expect(dent[0].available_until).toBeNull();
+    expect(dent[0].available_until).not.toBeNull(); // la disponibilité reste
+    const still = await db.asAnon(() => db.call(`select * from public.list_available_clinics('lac-1')`));
+    expect(still.map((c) => c.id)).toContain(dentistId);
 
     // Le patient peut immédiatement demander à un autre cabinet.
     const d2 = await approvedAvailableDentist("d2@test.tn");
@@ -211,11 +218,16 @@ describe("demande d'urgence (60 s)", () => {
     expect(after[0].seconds_left).toBe(0);
   });
 
-  it("un cabinet suspendu pendant la demande ne peut plus l'accepter", async () => {
+  it("l'admin ne peut pas suspendre un cabinet ayant une demande active", async () => {
     const r = await db.as(patientA, () => db.call(`select public.create_request($1, 'Sami', null) as id`, [dentistId]));
+    await expectError(
+      db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'suspended', 'test')`, [dentistId])),
+      "busy"
+    );
+    await db.as(dentistId, () => db.call(`select public.respond_request($1, false)`, [r[0].id]));
     await db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'suspended', 'test')`, [dentistId]));
     await expectError(
-      db.as(dentistId, () => db.call(`select public.respond_request($1, true)`, [r[0].id])),
+      db.as(dentistId, () => db.call(`select public.set_availability(true)`)),
       "dentist_not_approved"
     );
   });
@@ -290,7 +302,8 @@ describe("sécurité", () => {
 describe("espace admin", () => {
   it("liste, valide, suspend et supervise", async () => {
     const pendingId = await db.newUser("p@test.tn", "dentist");
-    await db.as(pendingId, () => db.call(SAVE_PROFILE, PROFILE.full));
+    const pp = [...PROFILE.full]; pp[7] = "ORDRE-PEND";
+    await db.as(pendingId, () => db.call(SAVE_PROFILE, pp));
 
     const pending = await db.as(adminId, () => db.call(`select * from public.admin_list_dentists('pending')`));
     expect(pending.map((d) => d.id)).toEqual([pendingId]);
@@ -312,5 +325,82 @@ describe("espace admin", () => {
 
     const recent = await db.as(adminId, () => db.call(`select * from public.admin_recent_requests()`));
     expect(Array.isArray(recent)).toBe(true);
+  });
+});
+
+describe("règles issues de l'application Flutter", () => {
+  const mk = (id: string) => db.as(patientA, () => db.call(`select public.create_request($1, 'Sami', null) as id`, [id]));
+  const accept = async (rid: string) =>
+    db.as(dentistId, () => db.call(`select public.respond_request($1, true) as s`, [rid]));
+
+  it("un numéro d'Ordre ne peut servir qu'une fois", async () => {
+    const other = await db.newUser("o@test.tn", "dentist");
+    const used = await db.admin(`select order_number from public.dentists where id=$1`, [dentistId]);
+    const p = [...PROFILE.full]; p[7] = ` ${used[0].order_number.toLowerCase()} `;
+    await expectError(db.as(other, () => db.call(SAVE_PROFILE, p)), "registration_used");
+  });
+
+  it("le téléphone doit être tunisien (8 chiffres)", async () => {
+    const other = await db.newUser("o2@test.tn", "dentist");
+    const p = [...PROFILE.full]; p[4] = "123"; p[7] = "ORDRE-X";
+    await expectError(db.as(other, () => db.call(SAVE_PROFILE, p)), "invalid_input");
+  });
+
+  it("parcours complet : demande, confirmation, arrivée, consultation terminée", async () => {
+    const r = await mk(dentistId);
+    await accept(r[0].id);
+    // le cabinet réservé disparaît de la liste
+    expect(await db.asAnon(() => db.call(`select * from public.list_available_clinics('lac-1')`))).toHaveLength(0);
+    const a = await db.as(patientA, () => db.call(`select public.mark_arrived($1) as s`, [r[0].id]));
+    expect(a[0].s).toBe("arrived");
+    expect(await db.asAnon(() => db.call(`select * from public.list_available_clinics('lac-1')`))).toHaveLength(0);
+    await expectError(db.as(dentistId, () => db.call(`select public.set_availability(false)`)), "busy");
+    const c = await db.as(dentistId, () => db.call(`select public.complete_request($1) as s`, [r[0].id]));
+    expect(c[0].s).toBe("completed");
+    // consommée : le cabinet doit se redéclarer
+    const d = await db.admin(`select available_until from public.dentists where id=$1`, [dentistId]);
+    expect(d[0].available_until).toBeNull();
+    const hist = await db.as(patientA, () => db.call(`select * from public.list_my_requests()`));
+    expect(hist).toHaveLength(1);
+    // le patient peut refaire une demande
+    await db.as(dentistId, () => db.call(`select public.set_availability(true)`));
+    expect((await mk(dentistId))[0].id).toBeTruthy();
+  });
+
+  it("transitions interdites", async () => {
+    const r = await mk(dentistId);
+    await expectError(db.as(patientA, () => db.call(`select public.mark_arrived($1)`, [r[0].id])), "invalid_transition");
+    await expectError(db.as(dentistId, () => db.call(`select public.complete_request($1)`, [r[0].id])), "invalid_transition");
+  });
+
+  it("le patient peut annuler une demande confirmée", async () => {
+    const r = await mk(dentistId);
+    await accept(r[0].id);
+    const c = await db.as(patientA, () => db.call(`select public.cancel_request($1) as s`, [r[0].id]));
+    expect(c[0].s).toBe("cancelled");
+  });
+
+  it("le dentiste peut libérer la place d'un patient non venu", async () => {
+    const r = await mk(dentistId);
+    await accept(r[0].id);
+    const x = await db.as(dentistId, () => db.call(`select public.release_request($1) as s`, [r[0].id]));
+    expect(x[0].s).toBe("cancelled");
+  });
+
+  it("modifier son profil pendant une demande active est refusé", async () => {
+    await mk(dentistId);
+    const p = [...PROFILE.full]; p[1] = "Autre nom";
+    await expectError(db.as(dentistId, () => db.call(SAVE_PROFILE, p)), "busy");
+  });
+
+  it("le journal d'activité est réservé à l'admin et trace les événements", async () => {
+    const r = await mk(dentistId);
+    await accept(r[0].id);
+    await expectError(db.as(patientA, () => db.call(`select * from public.admin_audit()`)), "not_admin");
+    const log = await db.as(adminId, () => db.call(`select * from public.admin_audit()`));
+    const actions = log.map((e) => e.action);
+    expect(actions).toEqual(expect.arrayContaining(["requested", "confirmed"]));
+    const ov = await db.as(adminId, () => db.call(`select public.admin_overview() as o`));
+    expect(ov[0].o.active_requests).toBe(1);
   });
 });

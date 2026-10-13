@@ -5,6 +5,8 @@ import { directionsUrl, telUrl } from "@/lib/maps";
 import { errorCode } from "@/lib/errors";
 import { dictionaries, dirOf, fmt, isLocale } from "@/lib/i18n";
 import { ZONES, zoneName } from "@/lib/zones";
+import { haversineKm, nearestZone } from "@/lib/geo";
+import { normalizeTnPhone } from "@/lib/phone";
 import { LEGAL, LEGAL_KEYS } from "@/content/legal";
 
 describe("compte à rebours", () => {
@@ -48,6 +50,9 @@ describe("erreurs", () => {
     expect(errorCode({ message: "Token has expired or is invalid" })).toBe("invalid_code");
     expect(errorCode({ message: "Email not confirmed" })).toBe("email_not_confirmed");
     expect(errorCode(new Error("supabase_not_configured"))).toBe("supabase_not_configured");
+    expect(errorCode({ message: "registration_used" })).toBe("registration_used");
+    expect(errorCode({ message: "invalid_transition" })).toBe("invalid_transition");
+    expect(errorCode({ message: "busy" })).toBe("busy");
     expect(errorCode({ message: "boom" })).toBe("unknown");
     expect(errorCode(null)).toBe("unknown");
   });
@@ -58,7 +63,8 @@ describe("erreurs", () => {
         "not_authenticated", "not_a_patient", "not_a_dentist", "not_admin", "invalid_input", "rate_limited",
         "patient_has_active_request", "clinic_unavailable", "clinic_busy", "request_not_found",
         "dentist_not_approved", "dentist_not_found", "supabase_not_configured", "invalid_credentials",
-        "invalid_code", "email_rate_limit", "email_not_confirmed", "unknown",
+        "invalid_code", "email_rate_limit", "email_not_confirmed", "busy", "invalid_transition",
+        "registration_used", "unknown",
       ]) {
         expect(codes).toContain(c);
       }
@@ -110,5 +116,36 @@ describe("zone pilote", () => {
     }
     expect(zoneName("la-marsa", "fr")).toBe("La Marsa");
     expect(zoneName("la-marsa", "ar")).toBe("المرسى");
+  });
+});
+
+describe("géolocalisation (zone uniquement)", () => {
+  it("calcule une distance plausible", () => {
+    expect(haversineKm(36.835, 10.238, 36.835, 10.238)).toBe(0);
+    const d = haversineKm(36.8665, 10.1647, 36.91, 10.3); // Ariana -> Gammarth
+    expect(d).toBeGreaterThan(10);
+    expect(d).toBeLessThan(15);
+  });
+  it("trouve la zone pilote la plus proche", () => {
+    expect(nearestZone(36.8352, 10.2381)?.id).toBe("lac-1");
+    expect(nearestZone(36.8782, 10.3238)?.id).toBe("la-marsa");
+  });
+  it("renvoie null hors de la zone pilote", () => {
+    expect(nearestZone(35.8256, 10.6084)).toBeNull(); // Sousse
+    expect(nearestZone(36.8, 10.18, 0.1)).toBeNull();
+  });
+});
+
+describe("téléphone tunisien", () => {
+  it("normalise vers +216XXXXXXXX", () => {
+    expect(normalizeTnPhone("71 000 010")).toBe("+21671000010");
+    expect(normalizeTnPhone("+216 20-000-000")).toBe("+21620000000");
+    expect(normalizeTnPhone("00216 98 123 456")).toBe("+21698123456");
+    expect(normalizeTnPhone("216 98 123 456")).toBe("+21698123456");
+  });
+  it("refuse les numéros invalides", () => {
+    expect(normalizeTnPhone("123")).toBeNull();
+    expect(normalizeTnPhone("+33 6 12 34 56 78")).toBeNull();
+    expect(normalizeTnPhone("")).toBeNull();
   });
 });

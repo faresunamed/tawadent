@@ -1,5 +1,5 @@
 export type DentistStatus = "pending" | "approved" | "suspended" | "rejected";
-export type RequestStatus = "pending" | "accepted" | "declined" | "expired" | "cancelled";
+export type RequestStatus = "pending" | "accepted" | "declined" | "expired" | "cancelled" | "arrived" | "completed";
 
 export type Clinic = {
   id: string;
@@ -26,6 +26,7 @@ export type PatientRequest = {
   created_at: string;
   expires_at: string;
   seconds_left: number;
+  arrived_at?: string | null;
   clinic?: ClinicDetails;
 };
 
@@ -61,6 +62,7 @@ export type AdminDentist = DentistRow & { email: string; created_at: string };
 export type AdminOverview = {
   dentists: Partial<Record<DentistStatus, number>>;
   available_now: number;
+  active_requests: number;
   requests_24h: Partial<Record<RequestStatus, number>>;
 };
 
@@ -71,4 +73,20 @@ export type AdminRecentRequest = {
   clinic_name: string;
   zone_id: string;
   response_seconds: number | null;
+};
+
+export type MyRequest = {
+  id: string;
+  status: RequestStatus;
+  zone_id: string;
+  clinic_name: string;
+  created_at: string;
+};
+
+export type AuditEvent = {
+  id: number;
+  at: string;
+  action: string;
+  clinic_name: string | null;
+  zone_id: string | null;
 };

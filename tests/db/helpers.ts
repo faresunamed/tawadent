@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -36,11 +36,10 @@ export type Db = {
 export async function createDb(): Promise<Db> {
   const pg = new PGlite();
   await pg.exec(SUPABASE_STUB);
-  const migration = readFileSync(
-    join(process.cwd(), "supabase/migrations/20261013000000_init.sql"),
-    "utf8"
-  );
-  await pg.exec(migration);
+  const dir = join(process.cwd(), "supabase/migrations");
+  for (const f of readdirSync(dir).filter((x) => x.endsWith(".sql")).sort()) {
+    await pg.exec(readFileSync(join(dir, f), "utf8"));
+  }
 
   const run = async (sql: string, params?: unknown[]) => (await pg.query(sql, params)).rows as any[];
 

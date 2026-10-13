@@ -24,6 +24,10 @@ npm run dev
 
 1. **Base de données** : *SQL Editor → New query* → colle tout le contenu de
    `supabase/migrations/20261013000000_init.sql` → **Run**.
+   **Mise à jour (règles Flutter)** : puis, **un script à la fois, dans cet ordre**
+   (PostgreSQL impose deux exécutions séparées pour les nouveaux états) :
+   1. `supabase/migrations/20261014000000_request_status_values.sql` → **Run**
+   2. `supabase/migrations/20261014000100_flutter_rules.sql` → **Run**
    Vérifie dans *Table Editor* : `zones` contient 15 lignes.
 2. **Connexion par email** : *Authentication → Providers → Email* : activé.
    Garde *Confirm email* activé (les dentistes confirment leur adresse).

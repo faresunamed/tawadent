@@ -68,7 +68,7 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
             type="password"
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             required
-            minLength={8}
+            minLength={mode === "signup" ? 10 : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             dir="ltr"

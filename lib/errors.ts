@@ -12,6 +12,9 @@ const KNOWN = [
   "request_not_found",
   "dentist_not_approved",
   "dentist_not_found",
+  "busy",
+  "invalid_transition",
+  "registration_used",
 ] as const;
 
 // Erreurs de l'authentification Supabase (messages en anglais) -> codes internes.

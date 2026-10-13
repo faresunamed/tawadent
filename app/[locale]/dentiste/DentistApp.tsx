@@ -9,6 +9,7 @@ import { fmt } from "@/lib/i18n";
 import { ZONES, zoneName } from "@/lib/zones";
 import { telUrl } from "@/lib/maps";
 import { minutesUntil } from "@/lib/time";
+import { normalizeTnPhone } from "@/lib/phone";
 import { beep } from "@/lib/alert";
 import type { DentistRow, InboxRequest } from "@/lib/types";
 import PasswordAuth from "@/components/PasswordAuth";
@@ -109,6 +110,7 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
   }, []);
 
   const pending = inbox.items.filter((i) => i.status === "pending");
+  const active = inbox.items.filter((i) => i.status === "accepted" || i.status === "arrived");
   useEffect(() => {
     if (!pending.length) return;
     const original = document.title;
@@ -136,10 +138,21 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
     setBusy(false);
   }
 
+  async function transition(fn: "complete_request" | "release_request", id: string, confirmText: string) {
+    if (!window.confirm(confirmText)) return;
+    setBusy(true);
+    setError(null);
+    const { error } = await getSupabase().rpc(fn, { p_request: id });
+    if (error) setError(error);
+    await Promise.all([loadInbox(), loadRow()]);
+    setBusy(false);
+  }
+
   if (!rowLoaded) return <p className="muted">{t.common.loading}</p>;
 
   const minutesLeft = minutesUntil(row?.available_until ?? null, now);
-  const history = inbox.items.filter((i) => i.status !== "pending");
+  const history = inbox.items.filter((i) => !["pending", "accepted", "arrived"].includes(i.status));
+  const locked = active.length > 0 || pending.length > 0;
 
   return (
     <div className="stack-lg">
@@ -174,9 +187,10 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
           <p className="muted">
             {row.full_name} · {zoneName(row.zone_id, locale)} · {row.address}
           </p>
-          <button className="btn btn-ghost" onClick={() => setEditing(true)}>
+          <button className="btn btn-ghost" onClick={() => setEditing(true)} disabled={locked}>
             {t.dentist.editProfile}
           </button>
+          {locked && <p className="muted small">{t.dentist.busyLocked}</p>}
         </section>
       )}
 
@@ -201,17 +215,58 @@ function Dashboard({ userId, email, onLogout }: { userId: string; email: string;
               <InfoNotice>{t.dentist.availOff}</InfoNotice>
             )}
             <div className="row">
-              <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => setAvailability(true)}>
+              <button className="btn btn-primary btn-lg" disabled={busy || active.length > 0} onClick={() => setAvailability(true)}>
                 {t.dentist.goAvailable}
               </button>
               {minutesLeft > 0 && (
-                <button className="btn btn-ghost" disabled={busy} onClick={() => setAvailability(false)}>
+                <button className="btn btn-ghost" disabled={busy || active.length > 0} onClick={() => setAvailability(false)}>
                   {t.dentist.goUnavailable}
                 </button>
               )}
             </div>
             <p className="muted small">{t.dentist.availNote}</p>
           </section>
+
+          {active.map((r) => (
+            <section key={r.id} className="card stack" aria-live="polite">
+              <div className="row between">
+                <h2 className="ok-title">{r.status === "arrived" ? t.dentist.arrivedTitle : t.dentist.acceptedTitle}</h2>
+                <span className="badge badge-ok">{t.requestStatus[r.status]}</span>
+              </div>
+              <p>
+                {t.dentist.patientLabel} : <strong>{r.patient_first_name}</strong>
+                {r.patient_phone && (
+                  <>
+                    {" · "}
+                    <a href={telUrl(r.patient_phone)} dir="ltr">
+                      {r.patient_phone}
+                    </a>
+                  </>
+                )}
+              </p>
+              <p className="muted small">{t.dentist.reserved}</p>
+              <div className="row">
+                {r.status === "arrived" && (
+                  <button
+                    className="btn btn-primary btn-lg"
+                    disabled={busy}
+                    onClick={() => transition("complete_request", r.id, t.dentist.completeConfirm)}
+                  >
+                    {t.dentist.complete}
+                  </button>
+                )}
+                {r.status === "accepted" && (
+                  <button
+                    className="btn btn-ghost"
+                    disabled={busy}
+                    onClick={() => transition("release_request", r.id, t.dentist.releaseConfirm)}
+                  >
+                    {t.dentist.release}
+                  </button>
+                )}
+              </div>
+            </section>
+          ))}
 
           <section className="card stack" aria-live="assertive">
             <h2>{t.dentist.inboxTitle}</h2>
@@ -329,6 +384,11 @@ function ProfileForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const phone = normalizeTnPhone(form.phone);
+    if (!phone) {
+      setError(new Error("invalid_input"));
+      return;
+    }
     setBusy(true);
     setError(null);
     const { error } = await getSupabase().rpc("save_dentist_profile", {
@@ -336,7 +396,7 @@ function ProfileForm({
       p_clinic_name: form.clinic_name,
       p_address: form.address,
       p_zone_id: form.zone_id,
-      p_phone: form.phone,
+      p_phone: phone,
       p_latitude: num(form.latitude),
       p_longitude: num(form.longitude),
       p_order_number: form.order_number,
@@ -380,11 +440,13 @@ function ProfileForm({
           type="tel"
           inputMode="tel"
           required
-          pattern="[0-9+ ()\-]{6,30}"
+          pattern="[0-9+ ()\-]{8,30}"
+          placeholder="71 000 010"
           value={form.phone}
           onChange={set("phone")}
           dir="ltr"
         />
+        <span className="help">{t.dentist.phoneHelp}</span>
       </label>
       <div className="grid-2">
         <label className="field">

@@ -28,7 +28,7 @@ Le navigateur n'a **aucun droit d'écriture direct** sur les tables. Toute actio
 - Limite de 5 demandes par heure et par patient.
 - Le rôle `admin` ne peut pas être obtenu depuis l'application.
 
-Tout est décrit dans `supabase/migrations/20261013000000_init.sql` et vérifié par 28 tests.
+Tout est décrit dans `supabase/migrations/20261013000000_init.sql` et complété par `20261014000000_request_status_values.sql` puis `20261014000100_flutter_rules.sql` (règles reprises de l'app Flutter : arrivée, fin de consultation, journal d'activité, n° d'Ordre unique, téléphone +216), et vérifié par 36 tests.
 
 ## Démarrer en local
 
@@ -43,12 +43,12 @@ npm run dev                  # http://localhost:3000
 ```bash
 npm test            # tout
 npm run test:unit   # 13 tests : compte à rebours, liens, erreurs, FR/AR, zones
-npm run test:db     # 28 tests : le vrai schéma SQL dans un PostgreSQL embarqué
+npm run test:db     # 36 tests : le vrai schéma SQL dans un PostgreSQL embarqué
 npm run lint        # vérification des types TypeScript
 npm run build       # compilation de production
 ```
 
-Les tests de base de données exécutent la migration réelle et couvrent : double demande, expiration à 60 s, consommation de la disponibilité, suspension, droits par rôle, anti-abus.
+Les tests de base de données exécutent la migration réelle et couvrent : double demande, expiration à 60 s, cycle confirmée → arrivée → terminée, consommation de la disponibilité, suspension, droits par rôle, anti-abus.
 
 ## Mise en ligne
 

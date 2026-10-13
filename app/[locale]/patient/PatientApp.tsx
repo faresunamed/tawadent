@@ -6,10 +6,11 @@ import { useAuth } from "@/lib/useAuth";
 import { useT } from "@/lib/useLocale";
 import { useCountdown } from "@/lib/useCountdown";
 import { fmt } from "@/lib/i18n";
-import { ZONES } from "@/lib/zones";
+import { ZONES, zoneName } from "@/lib/zones";
 import { directionsUrl, telUrl } from "@/lib/maps";
 import { formatCountdown, minutesUntil } from "@/lib/time";
-import type { Clinic, PatientRequest } from "@/lib/types";
+import { nearestZone } from "@/lib/geo";
+import type { Clinic, MyRequest, PatientRequest } from "@/lib/types";
 import EmailOtpLogin from "@/components/EmailOtpLogin";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
@@ -28,6 +29,8 @@ export default function PatientApp() {
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [geo, setGeo] = useState<"idle" | "locating" | "outside" | "denied" | "found">("idle");
+  const [history, setHistory] = useState<MyRequest[]>([]);
   const [request, setRequest] = useState<Tracked | null>(null);
   const requestRef = useRef<Tracked | null>(null);
   requestRef.current = request;
@@ -45,6 +48,32 @@ export default function PatientApp() {
         if (!error && data) track(data as PatientRequest);
       });
   }, [userId, auth.role, track]);
+
+  const loadHistory = useCallback(async () => {
+    const { data, error } = await getSupabase().rpc("list_my_requests");
+    if (!error && Array.isArray(data)) setHistory(data as MyRequest[]);
+  }, []);
+
+  useEffect(() => {
+    if (userId && auth.role === "patient" && !request) loadHistory();
+  }, [userId, auth.role, request, loadHistory]);
+
+  // --- Localisation : on n'en garde que la zone, jamais les coordonnées ---
+  function locate() {
+    if (!navigator.geolocation) return setGeo("denied");
+    setGeo("locating");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const z = nearestZone(pos.coords.latitude, pos.coords.longitude);
+        if (z) {
+          setZoneId(z.id);
+          setGeo("found");
+        } else setGeo("outside");
+      },
+      () => setGeo("denied"),
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  }
 
   // --- Liste des cabinets de la zone (rafraîchie toutes les 10 s) ---
   const loadClinics = useCallback(async () => {
@@ -80,12 +109,12 @@ export default function PatientApp() {
     }
   }, [track]);
 
-  const pending = request?.data.status === "pending";
+  const pending = ["pending", "accepted", "arrived"].includes(request?.data.status ?? "");
   const requestId = request?.data.id;
 
   useEffect(() => {
     if (!pending || !requestId) return;
-    const id = setInterval(refreshRequest, 2000);
+    const id = setInterval(refreshRequest, request?.data.status === "pending" ? 2000 : 5000);
     const sb = getSupabase();
     const channel = userId
       ? sb
@@ -101,7 +130,7 @@ export default function PatientApp() {
       clearInterval(id);
       if (channel) sb.removeChannel(channel);
     };
-  }, [pending, requestId, userId, refreshRequest]);
+  }, [pending, requestId, userId, refreshRequest, request?.data.status]);
 
   // --- Actions ---
   async function sendRequest(e: React.FormEvent) {
@@ -127,8 +156,18 @@ export default function PatientApp() {
     else track(got.data as PatientRequest);
   }
 
+  async function markArrived() {
+    if (!request) return;
+    setBusy(true);
+    const { error } = await getSupabase().rpc("mark_arrived", { p_request: request.data.id });
+    if (error) setError(error);
+    await refreshRequest();
+    setBusy(false);
+  }
+
   async function cancelRequest() {
     if (!request) return;
+    if (!window.confirm(t.patient.cancelConfirm)) return;
     setBusy(true);
     await getSupabase().rpc("cancel_request", { p_request: request.data.id });
     await refreshRequest();
@@ -159,6 +198,7 @@ export default function PatientApp() {
         tracked={request}
         busy={busy}
         onCancel={cancelRequest}
+        onArrived={markArrived}
         onExpire={refreshRequest}
         onAnother={backToList}
         onNew={newSearch}
@@ -173,6 +213,14 @@ export default function PatientApp() {
     <div className="stack-lg">
       <section className="card">
         <h2>{t.patient.zoneTitle}</h2>
+        <button type="button" className="btn btn-secondary" onClick={locate} disabled={geo === "locating"}>
+          {geo === "locating" ? t.patient.locating : `📍 ${t.patient.useLocation}`}
+        </button>
+        {geo === "found" && zoneId && (
+          <p className="muted small">{fmt(t.patient.zoneDetected, { zone: zoneName(zoneId, locale) })}</p>
+        )}
+        {geo === "outside" && <InfoNotice tone="warn">{t.patient.locationOutside}</InfoNotice>}
+        {geo === "denied" && <InfoNotice tone="warn">{t.patient.locationDenied}</InfoNotice>}
         <div className="zone-grid" role="radiogroup" aria-label={t.patient.zoneTitle}>
           {ZONES.map((z) => (
             <button
@@ -264,6 +312,26 @@ export default function PatientApp() {
       )}
 
       <ErrorNotice error={error} />
+
+      {history.length > 0 && (
+        <section className="card">
+          <h2>{t.patient.myRequests}</h2>
+          <ul className="clinic-list">
+            {history.map((h) => (
+              <li key={h.id} className="clinic">
+                <div>
+                  <strong>{h.clinic_name}</strong>
+                  <div className="muted small">
+                    {new Date(h.created_at).toLocaleString(locale === "ar" ? "ar-TN" : "fr-TN")} ·{" "}
+                    {zoneName(h.zone_id, locale)}
+                  </div>
+                </div>
+                <span className="badge">{t.requestStatus[h.status]}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -272,6 +340,7 @@ function RequestView({
   tracked,
   busy,
   onCancel,
+  onArrived,
   onExpire,
   onAnother,
   onNew,
@@ -279,6 +348,7 @@ function RequestView({
   tracked: Tracked;
   busy: boolean;
   onCancel: () => void;
+  onArrived: () => void;
   onExpire: () => void;
   onAnother: () => void;
   onNew: () => void;
@@ -305,12 +375,13 @@ function RequestView({
     );
   }
 
-  if (data.status === "accepted" && data.clinic) {
+  if ((data.status === "accepted" || data.status === "arrived") && data.clinic) {
     const c = data.clinic;
+    const arrived = data.status === "arrived";
     return (
       <section className="card stack" aria-live="polite">
-        <h2 className="ok-title">{t.patient.acceptedTitle}</h2>
-        <p>{t.patient.acceptedText}</p>
+        <h2 className="ok-title">{arrived ? t.patient.arrivedTitle : t.patient.acceptedTitle}</h2>
+        <p>{arrived ? t.patient.arrivedText : t.patient.acceptedText}</p>
         <div className="detail">
           <strong>{c.clinic_name}</strong>
           <div>{c.dentist_name}</div>
@@ -326,7 +397,34 @@ function RequestView({
             {t.patient.directions}
           </a>
         </div>
-        <button className="link-btn" onClick={onNew}>
+        <button
+          className="link-btn"
+          onClick={() => {
+            navigator.clipboard?.writeText(c.phone).then(() => window.alert(t.patient.copied)).catch(() => {});
+          }}
+        >
+          {t.patient.copyPhone}
+        </button>
+        {!arrived && (
+          <button className="btn btn-danger btn-lg" onClick={onArrived} disabled={busy}>
+            {t.patient.iAmArrived}
+          </button>
+        )}
+        {!arrived && (
+          <button className="btn btn-ghost" onClick={onCancel} disabled={busy}>
+            {t.patient.cancelRequest}
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  if (data.status === "completed") {
+    return (
+      <section className="card center stack" aria-live="polite">
+        <h2 className="ok-title">{t.patient.completedTitle}</h2>
+        <p>{t.patient.completedText}</p>
+        <button className="btn btn-primary btn-lg" onClick={onNew}>
           {t.patient.newSearch}
         </button>
       </section>

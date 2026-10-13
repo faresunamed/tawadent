@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useT } from "@/lib/useLocale";
 import { zoneName } from "@/lib/zones";
 import { minutesUntil } from "@/lib/time";
-import type { AdminDentist, AdminOverview, AdminRecentRequest, DentistStatus } from "@/lib/types";
+import type { AdminDentist, AdminOverview, AdminRecentRequest, AuditEvent, DentistStatus } from "@/lib/types";
 import PasswordAuth from "@/components/PasswordAuth";
 import { ConfigNotice, ErrorNotice, InfoNotice } from "@/components/Notice";
 
@@ -40,22 +40,25 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [dentists, setDentists] = useState<AdminDentist[] | null>(null);
   const [recent, setRecent] = useState<AdminRecentRequest[]>([]);
+  const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const sb = getSupabase();
-    const [o, d, r] = await Promise.all([
+    const [o, d, r, a] = await Promise.all([
       sb.rpc("admin_overview"),
       sb.rpc("admin_list_dentists", { p_status: filter === "all" ? null : filter }),
       sb.rpc("admin_recent_requests"),
+      sb.rpc("admin_audit"),
     ]);
-    const err = o.error || d.error || r.error;
+    const err = o.error || d.error || r.error || a.error;
     if (err) setError(err);
     else setError(null);
     if (o.data) setOverview(o.data as AdminOverview);
     if (d.data) setDentists(d.data as AdminDentist[]);
     if (r.data) setRecent(r.data as AdminRecentRequest[]);
+    if (a.data) setAudit(a.data as AuditEvent[]);
   }, [filter]);
 
   useEffect(() => {
@@ -70,6 +73,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       note = window.prompt(t.admin.notePrompt, "");
       if (note === null) return; // annulé
     }
+    if (!askNote && !window.confirm(t.admin.confirmDecision)) return;
     setBusyId(d.id);
     const { error } = await getSupabase().rpc("admin_set_dentist_status", {
       p_dentist: d.id,
@@ -100,6 +104,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       <section className="card stack">
         <div className="stats">
           {stat(t.admin.availableNow, overview?.available_now)}
+          {stat(t.admin.activeRequests, overview?.active_requests)}
           {STATUSES.map((s) => stat(`${t.admin.dentistsByStatus} · ${t.dentist.statusLabels[s]}`, overview?.dentists[s]))}
         </div>
         <h3>{t.admin.requests24h}</h3>
@@ -204,6 +209,39 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <td>{zoneName(r.zone_id, locale)}</td>
                   <td>{t.requestStatus[r.status]}</td>
                   <td dir="ltr">{r.response_seconds ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="card stack">
+        <h2>{t.admin.activityTitle}</h2>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t.admin.colTime}</th>
+                <th>{t.admin.colEvent}</th>
+                <th>{t.admin.colClinic}</th>
+                <th>{t.admin.colZone}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.map((e) => (
+                <tr key={e.id}>
+                  <td>
+                    {new Date(e.at).toLocaleString(locale === "ar" ? "ar-TN" : "fr-TN", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td>{(t.admin.events as Record<string, string>)[e.action] ?? e.action}</td>
+                  <td>{e.clinic_name ?? "—"}</td>
+                  <td>{e.zone_id ? zoneName(e.zone_id, locale) : "—"}</td>
                 </tr>
               ))}
             </tbody>

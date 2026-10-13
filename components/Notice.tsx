@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "@/lib/useLocale";
-import { errorCode } from "@/lib/errors";
+import { errorCode, rawMessage } from "@/lib/errors";
 import { missingSupabaseVars } from "@/lib/supabase";
 
 export function ErrorNotice({ error }: { error: unknown }) {
@@ -11,6 +11,11 @@ export function ErrorNotice({ error }: { error: unknown }) {
   return (
     <div className="alert alert-error" role="alert">
       {t.errors[code]}
+      {code === "unknown" && rawMessage(error) && (
+        <div className="small" dir="ltr" style={{ marginTop: 6, opacity: 0.8 }}>
+          <code>{rawMessage(error)}</code>
+        </div>
+      )}
     </div>
   );
 }

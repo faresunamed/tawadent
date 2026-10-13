@@ -46,6 +46,7 @@ describe("erreurs", () => {
     expect(errorCode({ message: "rate_limited" })).toBe("rate_limited");
     expect(errorCode({ message: "Invalid login credentials" })).toBe("invalid_credentials");
     expect(errorCode({ message: "Token has expired or is invalid" })).toBe("invalid_code");
+    expect(errorCode({ message: "Email not confirmed" })).toBe("email_not_confirmed");
     expect(errorCode(new Error("supabase_not_configured"))).toBe("supabase_not_configured");
     expect(errorCode({ message: "boom" })).toBe("unknown");
     expect(errorCode(null)).toBe("unknown");
@@ -57,7 +58,7 @@ describe("erreurs", () => {
         "not_authenticated", "not_a_patient", "not_a_dentist", "not_admin", "invalid_input", "rate_limited",
         "patient_has_active_request", "clinic_unavailable", "clinic_busy", "request_not_found",
         "dentist_not_approved", "dentist_not_found", "supabase_not_configured", "invalid_credentials",
-        "invalid_code", "email_rate_limit", "unknown",
+        "invalid_code", "email_rate_limit", "email_not_confirmed", "unknown",
       ]) {
         expect(codes).toContain(c);
       }

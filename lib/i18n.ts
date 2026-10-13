@@ -197,6 +197,7 @@ const fr = {
     supabase_not_configured:
       "L'application n'est pas encore connectée à sa base de données (variables d'environnement manquantes).",
     invalid_credentials: "Email ou mot de passe incorrect.",
+    email_not_confirmed: "Adresse email non confirmée. Cliquez sur le lien reçu par email, puis reconnectez-vous.",
     invalid_code: "Code incorrect ou expiré. Demandez un nouveau code.",
     email_rate_limit: "Trop de tentatives. Patientez quelques minutes avant de réessayer.",
     unknown: "Une erreur est survenue. Réessayez.",
@@ -382,6 +383,7 @@ const ar: Dict = {
     dentist_not_found: "طبيب الأسنان غير موجود.",
     supabase_not_configured: "التطبيق غير مرتبط بعد بقاعدة بياناته (متغيرات البيئة مفقودة).",
     invalid_credentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    email_not_confirmed: "لم يتم تأكيد البريد الإلكتروني بعد. انقر على الرابط الذي وصلك عبر البريد ثم سجّل الدخول من جديد.",
     invalid_code: "الرمز غير صحيح أو منتهي الصلاحية. اطلب رمزًا جديدًا.",
     email_rate_limit: "محاولات كثيرة. انتظر بضع دقائق ثم أعد المحاولة.",
     unknown: "حدث خطأ. أعد المحاولة.",

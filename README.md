@@ -30,6 +30,13 @@ Le navigateur n'a **aucun droit d'écriture direct** sur les tables. Toute actio
 
 Tout est décrit dans `supabase/migrations/20261013000000_init.sql` et complété par `20261014000000_request_status_values.sql` puis `20261014000100_flutter_rules.sql` (règles reprises de l'app Flutter : arrivée, fin de consultation, journal d'activité, n° d'Ordre unique, téléphone +216), et vérifié par 36 tests.
 
+## Comptes et connexion
+
+- **Patient** : inscription obligatoire avec prénom, téléphone tunisien (normalisé en `+216XXXXXXXX`), email, mot de passe (10 caractères minimum) et consentement. Connexion ensuite par email + mot de passe. Aucun accès aux zones ni aux cabinets sans compte. Le prénom et le téléphone sont transmis automatiquement au cabinet choisi (plus de formulaire d'envoi).
+- **Dentiste** : email + mot de passe, puis validation manuelle par l'administration (n° d'inscription à l'Ordre, unique).
+- **Admin** : rôle attribué uniquement à la main dans la base (SQL).
+- Dans Supabase, désactiver *Authentication → Providers → Email → Confirm email* pour que l'inscription connecte immédiatement (sinon un lien de confirmation est envoyé par email).
+
 ## Démarrer en local
 
 ```bash

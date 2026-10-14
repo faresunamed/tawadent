@@ -4,6 +4,14 @@ import { useT } from "@/lib/useLocale";
 import { errorCode, rawMessage } from "@/lib/errors";
 import { missingSupabaseVars } from "@/lib/supabase";
 
+function projectHost(): string {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host;
+  } catch {
+    return "?";
+  }
+}
+
 export function ErrorNotice({ error }: { error: unknown }) {
   const { t } = useT();
   if (!error) return null;
@@ -11,6 +19,11 @@ export function ErrorNotice({ error }: { error: unknown }) {
   return (
     <div className="alert alert-error" role="alert">
       {t.errors[code]}
+      {code === "invalid_credentials" && (
+        <div className="small" dir="ltr" style={{ marginTop: 6, opacity: 0.8 }}>
+          <code>{projectHost()}</code>
+        </div>
+      )}
       {code === "unknown" && rawMessage(error) && (
         <div className="small" dir="ltr" style={{ marginTop: 6, opacity: 0.8 }}>
           <code>{rawMessage(error)}</code>

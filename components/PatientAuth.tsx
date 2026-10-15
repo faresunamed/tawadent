@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { useT } from "@/lib/useLocale";
 import { normalizeTnPhone } from "@/lib/phone";
+import PasswordField from "./PasswordField";
 import { ErrorNotice, InfoNotice } from "./Notice";
 
 /** Inscription et connexion du patient : email + mot de passe. */
@@ -12,6 +13,7 @@ export default function PatientAuth({ redirectPath }: { redirectPath: string }) 
   const [register, setRegister] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [firstName, setFirstName] = useState("");
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
@@ -33,6 +35,7 @@ export default function PatientAuth({ redirectPath }: { redirectPath: string }) 
     }
     const tn = normalizeTnPhone(phone);
     if (!tn) return setError(new Error("invalid_input"));
+    if (password !== confirm) return setError(new Error("password_mismatch"));
     setBusy(true);
     const { data, error } = await sb.auth.signUp({
       email: email.trim(),
@@ -75,18 +78,20 @@ export default function PatientAuth({ redirectPath }: { redirectPath: string }) 
         </label>
         <label className="field">
           <span className="label">{t.common.password}</span>
-          <input
-            className="input"
-            type="password"
-            autoComplete={register ? "new-password" : "current-password"}
-            required
-            minLength={register ? 10 : undefined}
+          <PasswordField
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            dir="ltr"
+            onChange={setPassword}
+            autoComplete={register ? "new-password" : "current-password"}
+            minLength={register ? 10 : undefined}
           />
           {register && <span className="help">{t.dentist.passwordHelp}</span>}
         </label>
+        {register && (
+          <label className="field">
+            <span className="label">{t.common.confirmPassword}</span>
+            <PasswordField value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={10} />
+          </label>
+        )}
         {register && (
           <label className="check">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required />
@@ -104,6 +109,7 @@ export default function PatientAuth({ redirectPath }: { redirectPath: string }) 
         className="link-btn"
         onClick={() => {
           setRegister(!register);
+          setConfirm("");
           setError(null);
           setCreated(false);
         }}

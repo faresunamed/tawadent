@@ -65,7 +65,7 @@ describe("erreurs", () => {
         "patient_has_active_request", "clinic_unavailable", "clinic_busy", "request_not_found",
         "dentist_not_approved", "dentist_not_found", "supabase_not_configured", "invalid_credentials",
         "invalid_code", "email_rate_limit", "email_not_confirmed", "busy", "invalid_transition",
-        "registration_used", "unknown",
+        "registration_used", "password_mismatch", "unknown",
       ]) {
         expect(codes).toContain(c);
       }

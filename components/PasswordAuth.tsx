@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { useT } from "@/lib/useLocale";
+import PasswordField from "./PasswordField";
 import { ErrorNotice, InfoNotice } from "./Notice";
 
 type Props = {
@@ -17,6 +18,7 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [created, setCreated] = useState(false);
@@ -31,6 +33,11 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
       const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
       if (error) setError(error);
     } else {
+      if (password !== confirm) {
+        setError(new Error("password_mismatch"));
+        setBusy(false);
+        return;
+      }
       const { data, error } = await sb.auth.signUp({
         email: email.trim(),
         password,
@@ -66,18 +73,20 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
         </label>
         <label className="field">
           <span className="label">{t.common.password}</span>
-          <input
-            className="input"
-            type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={mode === "signup" ? 10 : undefined}
+          <PasswordField
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            dir="ltr"
+            onChange={setPassword}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            minLength={mode === "signup" ? 10 : undefined}
           />
           {mode === "signup" && <span className="help">{t.dentist.passwordHelp}</span>}
         </label>
+        {mode === "signup" && (
+          <label className="field">
+            <span className="label">{t.common.confirmPassword}</span>
+            <PasswordField value={confirm} onChange={setConfirm} autoComplete="new-password" minLength={10} />
+          </label>
+        )}
         <button className="btn btn-primary" disabled={busy}>
           {mode === "signin" ? t.dentist.signIn : t.dentist.signUp}
         </button>
@@ -90,6 +99,7 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
           className="link-btn"
           onClick={() => {
             setMode(mode === "signin" ? "signup" : "signin");
+            setConfirm("");
             setError(null);
             setCreated(false);
           }}

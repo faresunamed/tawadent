@@ -15,6 +15,7 @@ const KNOWN = [
   "busy",
   "invalid_transition",
   "registration_used",
+  "password_mismatch",
 ] as const;
 
 // Erreurs de l'authentification Supabase (messages en anglais) -> codes internes.

@@ -43,6 +43,8 @@ export type DentistRow = {
   status: DentistStatus;
   status_note: string | null;
   available_until: string | null;
+  card_path?: string | null;
+  patente_path?: string | null;
 };
 
 export type InboxRequest = {

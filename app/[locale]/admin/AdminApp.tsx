@@ -70,6 +70,13 @@ function AdminDashboard({ onLogout, email }: { onLogout: () => void; email: stri
     return () => clearInterval(id);
   }, [load]);
 
+  async function openDoc(path: string | null | undefined) {
+    if (!path) return;
+    const { data, error } = await getSupabase().storage.from("dentist-docs").createSignedUrl(path, 300);
+    if (error || !data) setError(error ?? new Error("upload_failed"));
+    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
   async function setStatus(d: AdminDentist, status: DentistStatus, askNote: boolean) {
     let note: string | null = null;
     if (askNote) {
@@ -156,6 +163,23 @@ function AdminDashboard({ onLogout, email }: { onLogout: () => void; email: stri
                   {t.admin.orderNumber} : <strong dir="ltr">{d.order_number}</strong>
                   {d.available_until && minutesUntil(d.available_until) > 0 && (
                     <span className="badge badge-ok">{minutesUntil(d.available_until)} {t.common.min}</span>
+                  )}
+                </div>
+                <div className="row small">
+                  {t.admin.docsLabel} :
+                  {d.card_path ? (
+                    <button type="button" className="link-btn" onClick={() => openDoc(d.card_path)}>
+                      {t.admin.viewCard}
+                    </button>
+                  ) : (
+                    <span className="badge badge-pending">{t.admin.viewCard} ✗</span>
+                  )}
+                  {d.patente_path ? (
+                    <button type="button" className="link-btn" onClick={() => openDoc(d.patente_path)}>
+                      {t.admin.viewPatente}
+                    </button>
+                  ) : (
+                    <span className="badge badge-pending">{t.admin.viewPatente} ✗</span>
                   )}
                 </div>
                 {d.status_note && <div className="muted small">“{d.status_note}”</div>}

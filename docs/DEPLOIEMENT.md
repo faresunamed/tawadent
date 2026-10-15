@@ -29,6 +29,7 @@ npm run dev
    1. `supabase/migrations/20261014000000_request_status_values.sql` → **Run**
    2. `supabase/migrations/20261014000100_flutter_rules.sql` → **Run**
    3. `supabase/migrations/20261014000200_auto_confirm_email.sql` → **Run** (plus de validation d'email)
+   4. `supabase/migrations/20261014000300_dentist_documents.sql` → **Run** (carte professionnelle + patente, stockage privé)
    Vérifie dans *Table Editor* : `zones` contient 15 lignes.
 2. **Connexion par email** : *Authentication → Providers → Email* : activé.
    Garde *Confirm email* activé (les dentistes confirment leur adresse).

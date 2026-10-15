@@ -16,6 +16,10 @@ const KNOWN = [
   "invalid_transition",
   "registration_used",
   "password_mismatch",
+  "documents_missing",
+  "file_too_large",
+  "file_type",
+  "upload_failed",
 ] as const;
 
 // Erreurs de l'authentification Supabase (messages en anglais) -> codes internes.

@@ -394,6 +394,8 @@ function ProfileForm({
     longitude: initial?.longitude != null ? String(initial.longitude) : "",
     order_number: initial?.order_number ?? "",
   });
+  const [cardFile, setCardFile] = useState<File | null>(null);
+  const [patenteFile, setPatenteFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -411,6 +413,18 @@ function ProfileForm({
       setError(new Error("invalid_input"));
       return;
     }
+    // Documents : obligatoires (déjà envoyés ou à joindre maintenant).
+    if ((!cardFile && !initial?.card_path) || (!patenteFile && !initial?.patente_path)) {
+      setError(new Error("documents_missing"));
+      return;
+    }
+    for (const f of [cardFile, patenteFile]) {
+      if (!f) continue;
+      if (f.size > 5 * 1024 * 1024) return setError(new Error("file_too_large"));
+      if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(f.type)) {
+        return setError(new Error("file_type"));
+      }
+    }
     setBusy(true);
     setError(null);
     const { error } = await getSupabase().rpc("save_dentist_profile", {
@@ -423,9 +437,34 @@ function ProfileForm({
       p_longitude: num(form.longitude),
       p_order_number: form.order_number,
     });
+    if (error) {
+      setBusy(false);
+      return setError(error);
+    }
+    // Envoi des scans dans le stockage privé, puis enregistrement des chemins.
+    try {
+      const sb = getSupabase();
+      const { data: u } = await sb.auth.getUser();
+      const uid = u.user?.id;
+      if (!uid) throw new Error("not_authenticated");
+      const up = async (file: File | null, kind: string, current?: string | null) => {
+        if (!file) return current as string;
+        const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+        const path = `${uid}/${kind}-${Date.now()}.${ext}`;
+        const { error: e } = await sb.storage.from("dentist-docs").upload(path, file, { contentType: file.type });
+        if (e) throw new Error("upload_failed");
+        return path;
+      };
+      const card = await up(cardFile, "card", initial?.card_path);
+      const patente = await up(patenteFile, "patente", initial?.patente_path);
+      const saved = await sb.rpc("save_dentist_documents", { p_card: card, p_patente: patente });
+      if (saved.error) throw saved.error;
+    } catch (e) {
+      setBusy(false);
+      return setError(e);
+    }
     setBusy(false);
-    if (error) setError(error);
-    else onSaved();
+    onSaved();
   }
 
   return (
@@ -486,6 +525,33 @@ function ProfileForm({
         <input className="input" required minLength={2} maxLength={60} value={form.order_number} onChange={set("order_number")} dir="ltr" />
         {initial && <span className="help">{t.dentist.orderChangeWarning}</span>}
       </label>
+      <fieldset className="docs">
+        <legend className="label">{t.dentist.docsTitle}</legend>
+        <p className="help">{t.dentist.docsHelp}</p>
+        <label className="field">
+          <span className="label">{t.dentist.cardLabel}</span>
+          <input
+            className="input"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            required={!initial?.card_path}
+            onChange={(e) => setCardFile(e.target.files?.[0] ?? null)}
+          />
+          {initial?.card_path && !cardFile && <span className="help">✓ {t.dentist.docSent}</span>}
+        </label>
+        <label className="field">
+          <span className="label">{t.dentist.patenteLabel}</span>
+          <input
+            className="input"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            required={!initial?.patente_path}
+            onChange={(e) => setPatenteFile(e.target.files?.[0] ?? null)}
+          />
+          {initial?.patente_path && !patenteFile && <span className="help">✓ {t.dentist.docSent}</span>}
+        </label>
+        {initial && <p className="help">{t.dentist.docChange}</p>}
+      </fieldset>
       <div className="row">
         <button className="btn btn-primary" disabled={busy}>
           {t.dentist.saveProfile}

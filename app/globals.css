@@ -694,3 +694,16 @@ a {
 .pw-eye:hover {
   color: var(--primary);
 }
+
+.docs {
+  border: 1px dashed #b9c9ce;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+.docs legend {
+  padding-inline: 6px;
+}

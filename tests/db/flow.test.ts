@@ -10,12 +10,16 @@ let patientB: string;
 let seq = 100;
 const SAVE_PROFILE = `select public.save_dentist_profile($1,$2,$3,$4,$5,$6,$7,$8) as s`;
 
+const saveDocs = (id: string, card = `${id}/card.pdf`, patente = `${id}/patente.pdf`) =>
+  db.as(id, () => db.call(`select public.save_dentist_documents($1, $2) as s`, [card, patente]));
+
 async function approvedAvailableDentist(email = "dentist@test.tn", zone = "lac-1") {
   const id = await db.newUser(email, "dentist");
   const p = [...PROFILE.full];
   p[3] = zone;
   p[7] = `ORDRE-${++seq}`;
   await db.as(id, () => db.call(SAVE_PROFILE, p));
+  await saveDocs(id);
   await db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'approved', null)`, [id]));
   await db.as(id, () => db.call(`select public.set_availability(true)`));
   return id;
@@ -410,5 +414,58 @@ describe("inscription sans validation d'email", () => {
     const id = await db.newUser("nouveau@test.tn", "patient");
     const r = await db.admin(`select email_confirmed_at is not null as ok from auth.users where id = $1`, [id]);
     expect(r[0].ok).toBe(true);
+  });
+});
+
+describe("documents du dentiste (carte professionnelle + patente)", () => {
+  it("l'admin ne peut pas valider un dentiste sans les deux documents", async () => {
+    const id = await db.newUser("nodocs@test.tn", "dentist");
+    const p = [...PROFILE.full]; p[7] = "ORDRE-NODOCS";
+    await db.as(id, () => db.call(SAVE_PROFILE, p));
+    await expectError(
+      db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'approved', null)`, [id])),
+      "documents_missing"
+    );
+    await saveDocs(id);
+    await db.as(adminId, () => db.call(`select public.admin_set_dentist_status($1, 'approved', null)`, [id]));
+  });
+
+  it("les chemins doivent être dans le dossier du dentiste", async () => {
+    const id = await db.newUser("path@test.tn", "dentist");
+    const p = [...PROFILE.full]; p[7] = "ORDRE-PATH";
+    await db.as(id, () => db.call(SAVE_PROFILE, p));
+    await expectError(saveDocs(id, "autre-dossier/card.pdf", `${id}/patente.pdf`), "invalid_input");
+  });
+
+  it("un patient ne peut pas enregistrer de documents", async () => {
+    await expectError(
+      db.as(patientA, () => db.call(`select public.save_dentist_documents('x/a','x/b')`)),
+      "not_a_dentist"
+    );
+  });
+
+  it("changer un document d'un dentiste validé le remet en attente de validation", async () => {
+    const d = await approvedAvailableDentist("redo@test.tn");
+    const r = await saveDocs(d, `${d}/card-2.pdf`, `${d}/patente.pdf`);
+    expect(r[0].s).toBe("pending");
+  });
+
+  it("l'admin voit les chemins des documents", async () => {
+    const list = await db.as(adminId, () => db.call(`select * from public.admin_list_dentists('approved')`));
+    expect(list[0].card_path).toContain("card");
+    expect(list[0].patente_path).toContain("patente");
+  });
+
+  it("le stockage est privé : un dentiste ne lit que son dossier, l'admin lit tout", async () => {
+    const d2 = await approvedAvailableDentist("other@test.tn");
+    await db.admin(`insert into storage.objects (bucket_id, name) values ('dentist-docs', $1), ('dentist-docs', $2)`, [
+      `${dentistId}/card.pdf`, `${d2}/card.pdf`,
+    ]);
+    const mine = await db.as(dentistId, () => db.call(`select name from storage.objects`));
+    expect(mine.map((o) => o.name)).toEqual([`${dentistId}/card.pdf`]);
+    const all = await db.as(adminId, () => db.call(`select name from storage.objects`));
+    expect(all).toHaveLength(2);
+    const none = await db.as(patientA, () => db.call(`select name from storage.objects`));
+    expect(none).toHaveLength(0);
   });
 });

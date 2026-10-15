@@ -33,7 +33,7 @@ Tout est décrit dans `supabase/migrations/20261013000000_init.sql` et complét�
 ## Comptes et connexion
 
 - **Patient** : inscription obligatoire avec prénom, téléphone tunisien (normalisé en `+216XXXXXXXX`), email, mot de passe (10 caractères minimum) et consentement. Connexion ensuite par email + mot de passe. Aucun accès aux zones ni aux cabinets sans compte. Le prénom et le téléphone sont transmis automatiquement au cabinet choisi (plus de formulaire d'envoi).
-- **Dentiste** : email + mot de passe, puis validation manuelle par l'administration (n° d'inscription à l'Ordre, unique).
+- **Dentiste** : email + mot de passe, puis profil avec n° d'inscription à l'Ordre (unique) et **deux scans obligatoires** (carte professionnelle, patente ; PDF/JPG/PNG, 5 Mo max) envoyés dans un stockage privé Supabase (`dentist-docs`). Validation manuelle par l'administration, qui consulte les scans par liens temporaires ; impossible de valider sans les deux documents.
 - **Admin** : rôle attribué uniquement à la main dans la base (SQL).
 - Pas de validation d'email : la migration `20261014000200_auto_confirm_email.sql` confirme automatiquement tout nouveau compte. Désactiver aussi *Authentication → Providers → Email → Confirm email* dans Supabase (aucun email de confirmation n'est alors envoyé).
 

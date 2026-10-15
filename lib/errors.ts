@@ -22,7 +22,7 @@ const AUTH_PATTERNS: [RegExp, "invalid_credentials" | "invalid_code" | "email_ra
   [/invalid login credentials/i, "invalid_credentials"],
   [/email not confirmed/i, "email_not_confirmed"],
   [/token has expired|otp.*(expired|invalid)|invalid.*(otp|token)/i, "invalid_code"],
-  [/rate limit|too many requests|over_email_send_rate_limit/i, "email_rate_limit"],
+  [/rate limit|too many requests|over_email_send_rate_limit|for security purposes|only request this after/i, "email_rate_limit"],
 ];
 
 export type ErrorCode =

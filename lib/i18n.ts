@@ -277,7 +277,7 @@ const fr = {
     invalid_credentials: "Email ou mot de passe incorrect.",
     email_not_confirmed: "Adresse email non confirmée. Cliquez sur le lien reçu par email, puis reconnectez-vous.",
     invalid_code: "Code incorrect ou expiré. Demandez un nouveau code.",
-    email_rate_limit: "Trop de tentatives. Patientez quelques minutes avant de réessayer.",
+    email_rate_limit: "Trop de tentatives rapprochées. Patientez une minute, puis réessayez.",
     unknown: "Une erreur est survenue. Réessayez.",
   },
 };

@@ -53,6 +53,7 @@ describe("erreurs", () => {
     expect(errorCode({ message: "registration_used" })).toBe("registration_used");
     expect(errorCode({ message: "invalid_transition" })).toBe("invalid_transition");
     expect(errorCode({ message: "busy" })).toBe("busy");
+    expect(errorCode({ message: "For security purposes, you can only request this after 49 seconds." })).toBe("email_rate_limit");
     expect(errorCode({ message: "boom" })).toBe("unknown");
     expect(errorCode(null)).toBe("unknown");
   });

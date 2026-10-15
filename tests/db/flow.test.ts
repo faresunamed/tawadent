@@ -404,3 +404,11 @@ describe("règles issues de l'application Flutter", () => {
     expect(ov[0].o.active_requests).toBe(1);
   });
 });
+
+describe("inscription sans validation d'email", () => {
+  it("tout nouveau compte est confirmé automatiquement", async () => {
+    const id = await db.newUser("nouveau@test.tn", "patient");
+    const r = await db.admin(`select email_confirmed_at is not null as ok from auth.users where id = $1`, [id]);
+    expect(r[0].ok).toBe(true);
+  });
+});

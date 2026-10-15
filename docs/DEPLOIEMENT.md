@@ -28,6 +28,7 @@ npm run dev
    (PostgreSQL impose deux exécutions séparées pour les nouveaux états) :
    1. `supabase/migrations/20261014000000_request_status_values.sql` → **Run**
    2. `supabase/migrations/20261014000100_flutter_rules.sql` → **Run**
+   3. `supabase/migrations/20261014000200_auto_confirm_email.sql` → **Run** (plus de validation d'email)
    Vérifie dans *Table Editor* : `zones` contient 15 lignes.
 2. **Connexion par email** : *Authentication → Providers → Email* : activé.
    Garde *Confirm email* activé (les dentistes confirment leur adresse).

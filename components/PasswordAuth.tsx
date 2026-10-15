@@ -40,7 +40,10 @@ export default function PasswordAuth({ title, allowSignup, redirectPath }: Props
         },
       });
       if (error) setError(error);
-      else if (!data.session) setCreated(true);
+      else if (!data.session) {
+        const login = await sb.auth.signInWithPassword({ email: email.trim(), password });
+        if (login.error) setCreated(true);
+      }
     }
     setBusy(false);
   }

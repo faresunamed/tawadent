@@ -43,8 +43,12 @@ export default function PatientAuth({ redirectPath }: { redirectPath: string }) 
       },
     });
     setBusy(false);
-    if (error) setError(error);
-    else if (!data.session) setCreated(true);
+    if (error) return setError(error);
+    if (!data.session) {
+      // Compte confirmé automatiquement par la base : on connecte tout de suite.
+      const login = await sb.auth.signInWithPassword({ email: email.trim(), password });
+      if (login.error) setCreated(true);
+    }
   }
 
   return (
